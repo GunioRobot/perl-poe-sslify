@@ -23,7 +23,7 @@ POE::Session->create(
 
 			# Create the socketfactory wheel to listen for requests
 			$_[HEAP]->{'SOCKETFACTORY'} = POE::Wheel::SocketFactory->new(
-				'BindPort'	=>	5432,
+				'BindPort'	=>	9898,
 				'BindAddress'	=>	'localhost',
 				'Reuse'		=>	'yes',
 				'SuccessEvent'	=>	'Got_Connection',
