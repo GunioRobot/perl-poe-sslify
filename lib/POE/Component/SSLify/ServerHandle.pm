@@ -19,6 +19,10 @@ sub TIEHANDLE {
 
 	Net::SSLeay::set_fd( $ssl, $fileno );
 
+	# Socket is in non-blocking mode, so accept() will return immediately.
+	# die_if_ssl_error won't die on non-blocking errors. We don't need to call accept()
+	# again, because OpenSSL I/O functions (read, write, ...) can handle that entirely
+	# by self (it's needed to accept() once to determine connection type).
 	my $err = Net::SSLeay::accept( $ssl ) and die_if_ssl_error( 'ssl accept' );
 
 	my $self = bless {
@@ -85,7 +89,8 @@ sub WRITE {
 	my $wrote_len = Net::SSLeay::write( $self->{'ssl'}, substr( $buf, $offset, $len ) );
 
 	# Did we get an error or number of bytes written?
-	# Net::SSLeay::write() returns the number of bytes written, or -1 on error.
+	# Net::SSLeay::write() returns the number of bytes written, or 0 on unsuccessful
+	# operation (probably connection closed), or -1 on error.
 	if ( $wrote_len < 0 ) {
 		# The normal syswrite() POE uses expects 0 here.
 		return 0;

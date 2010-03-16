@@ -29,9 +29,6 @@ BEGIN {
 		Net::SSLeay::load_error_strings();
 		Net::SSLeay::SSLeay_add_ssl_algorithms();
 		Net::SSLeay::randomize();
-
-		# set nonblocking mode?
-		if ( ! defined &NONBLOCKING ) { *NONBLOCKING = sub () { 0 } }
 	}
 }
 
@@ -51,15 +48,10 @@ use Net::SSLeay qw( die_now die_if_ssl_error );
 # The server-side CTX stuff
 my $ctx = undef;
 
-# Helper sub to set blocking on a handle
-sub Set_Blocking {
+# Helper sub to set non-blocking on a handle
+sub Set_NonBlocking {
 	my $socket = shift;
 
-	# skip this? ( experimental )
-	return $socket if NONBLOCKING();
-
-	# Net::SSLeay needs blocking for setup.
-	#
 	# ActiveState Perl 5.8.0 dislikes the Win32-specific code to make
 	# a socket blocking, so we use IO::Handle's blocking(1) method.
 	# Perl 5.005_03 doesn't like blocking(), so we only use it in
@@ -67,7 +59,7 @@ sub Set_Blocking {
 	if ( $] >= 5.008 and $^O eq 'MSWin32' ) {
 		# From IO::Handle POD
 		# If an error occurs blocking will return undef and $! will be set.
-		if ( ! $socket->blocking( 1 ) ) {
+		if ( ! $socket->blocking( 0 ) ) {
 			die "Unable to set blocking mode on socket: $!";
 		}
 	} else {
@@ -77,7 +69,7 @@ sub Set_Blocking {
 			my $flags = fcntl( $socket, F_GETFL, 0 ) or die "fcntl( $socket, F_GETFL, 0 ) fails: $!";
 
 			# Okay, we patiently wait until the socket turns blocking mode
-			until( fcntl( $socket, F_SETFL, $flags & ~O_NONBLOCK ) ) {
+			until( fcntl( $socket, F_SETFL, $flags | O_NONBLOCK ) ) {
 				# What was the error?
 				if ( ! ( $! == EAGAIN or $! == EWOULDBLOCK ) ) {
 					# Fatal error...
@@ -88,7 +80,7 @@ sub Set_Blocking {
 			# Darned MSWin32 way...
 			# Do some ioctl magic here
 			# 126 is FIONBIO ( some docs say 0x7F << 16 )
-			my $flag = "0";
+			my $flag = "1";
 			ioctl( $socket, 0x80000000 | ( 4 << 16 ) | ( ord( 'f' ) << 8 ) | 126, $flag ) or die "ioctl( $socket, FIONBIO, $flag ) fails: $!";
 		}
 	}
@@ -107,8 +99,8 @@ sub Client_SSLify {
 		die "Did not get a defined socket";
 	}
 
-	# Set blocking on
-	$socket = Set_Blocking( $socket );
+	# Set non-blocking
+	$socket = Set_NonBlocking( $socket );
 
 	# Now, we create the new socket and bind it to our subclass of Net::SSLeay::Handle
 	my $newsock = gensym();
@@ -134,8 +126,8 @@ sub Server_SSLify {
 		die 'Please do SSLify_Options() first ( or pass in a $ctx object )';
 	}
 
-	# Set blocking on
-	$socket = Set_Blocking( $socket );
+	# Set non-blocking
+	$socket = Set_NonBlocking( $socket );
 
 	# Now, we create the new socket and bind it to our subclass of Net::SSLeay::Handle
 	my $newsock = gensym();
@@ -350,20 +342,6 @@ that you check for errors and not use SSL, like so:
 	Some users have reported success, others failure when they tried to utilize SSLify in both roles. This
 	would require more investigation, so please tread carefully if you need to use it!
 
-=head2 Blocking mode
-
-	Normally, Net::SSLeay requires the socket to be in blocking mode for the initial handshake to work. However,
-	various users ( especially ASCENT, thanks! ) have reported success in setting nonblocking mode for clients.
-
-	In order to enable nonblocking mode, you need to set the subroutine "NONBLOCKING" to a true value in this
-	package.
-
-		sub POE::Component::SSLify::NONBLOCKING { 1 }
-		use POE::Component::SSLify;
-
-	This is a global, and an EXPERIMENTAL feature! Please, pretty please report back to me your experience with
-	this. Hopefully someday SSLify will be fully nonblocking, thanks to your help!
-
 =head1 FUNCTIONS
 
 =head2 Client_SSLify
@@ -476,7 +454,7 @@ that you check for errors and not use SSL, like so:
 
 	Stuffs all of the above functions in @EXPORT_OK so you have to request them directly
 
-head1 SUPPORT
+=head1 SUPPORT
 
 You can find documentation for this module with the perldoc command.
 

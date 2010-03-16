@@ -29,6 +29,10 @@ sub TIEHANDLE {
 
 	Net::SSLeay::set_fd( $ssl, $fileno );   # Must use fileno
 
+	# Socket is in non-blocking mode, so connect() will return immediately.
+	# die_if_ssl_error won't die on non-blocking errors. We don't need to call connect()
+	# again, because OpenSSL I/O functions (read, write, ...) can handle that entirely
+	# by self (it's needed to connect() once to determine connection type).
 	my $resp = Net::SSLeay::connect( $ssl ) or die_if_ssl_error( 'ssl connect' );
 
 	my $self = bless {
