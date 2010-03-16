@@ -16,7 +16,11 @@ POE::Session->create(
 	'inline_states'	=>	{
 		'_start'	=>	sub {
 			# Okay, set the SSL options
-			SSLify_Options( 'server.key', 'server.crt' );
+			eval {
+				SSLify_Options( 'mylib/example.key', 'mylib/example.crt' );
+			};
+
+			SSLify_Options( '../mylib/example.key', '../mylib/example.crt' ) if ( $@ );
 
 			# Set the alias
 			$_[KERNEL]->alias_set( 'main' );
