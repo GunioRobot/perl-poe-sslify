@@ -30,7 +30,7 @@ POE::Component::Server::TCP->new
 	},
 	ClientDisconnected	=> sub
 	{
-		ok(1, 'SERVER: client disconnected');	
+		ok(1, 'SERVER: client disconnected');
 		$_[KERNEL]->post(myserver => 'shutdown');
 	},
 	ClientPreConnect	=> sub
